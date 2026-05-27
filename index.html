@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="西谷中学校 野球部の活動予定をCSVから表示するページです。" />
+  <meta name="last-modified" content="2026-05-27" />
+  <title>西谷中学校 野球部 活動予定表</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --main: #12355b;
+      --main-2: #1f5f8b;
+      --accent: #e8f3ff;
+      --line: #d7e0ea;
+      --text: #1f2937;
+      --muted: #64748b;
+      --practice-bg: #ecfdf5;
+      --practice-fg: #047857;
+      --game-bg: #fff7ed;
+      --game-fg: #c2410c;
+      --test-bg: #fef2f2;
+      --test-fg: #b91c1c;
+      --off-bg: #f1f5f9;
+      --off-fg: #475569;
+      --other-bg: #eef2ff;
+      --other-fg: #3730a3;
+      --warn-bg: #fffbeb;
+      --warn-line: #fde68a;
+      --warn-fg: #92400e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #eaf4ff 0%, var(--bg) 42%, #ffffff 100%);
+    }
+
+    a { color: inherit; }
+
+    header {
+      background: linear-gradient(135deg, var(--main), var(--main-2));
+      color: #fff;
+      padding: 26px 14px 24px;
+      text-align: center;
+    }
+
+    .school-name {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 8px 0 10px;
+      font-size: clamp(1.55rem, 5vw, 2.35rem);
+      line-height: 1.25;
+      letter-spacing: 0.04em;
+    }
+
+    .month-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 15px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      font-weight: 800;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 18px 12px 42px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+      padding: 14px 16px;
+      margin: 12px 0 16px;
+      line-height: 1.7;
+    }
+
+    .panel strong { color: var(--main); }
+
+    .status {
+      display: none;
+      border: 1px solid var(--warn-line);
+      background: var(--warn-bg);
+      color: var(--warn-fg);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-size: 0.93rem;
+    }
+
+    .notes {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .notes ul {
+      margin: 4px 0 0 1.2em;
+      padding: 0;
+    }
+
+    .toolbar {
+      display: grid;
+      gap: 10px;
+      margin: 16px 0;
+    }
+
+    .filter-box {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 3px;
+    }
+
+    button, .file-label {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      white-space: nowrap;
+      cursor: pointer;
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    button.active {
+      background: var(--main);
+      color: #fff;
+      border-color: var(--main);
+    }
+
+    .file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f8fafc;
+    }
+
+    input[type="file"] { display: none; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      font-size: 0.86rem;
+      color: var(--muted);
+      align-items: center;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      background: #94a3b8;
+    }
+
+    .dot.practice { background: #22c55e; }
+    .dot.game { background: #f97316; }
+    .dot.test { background: #ef4444; }
+    .dot.off { background: #94a3b8; }
+    .dot.other { background: #6366f1; }
+
+    .schedule-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .day-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 12px;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+    }
+
+    .date-box {
+      text-align: center;
+      border-radius: 14px;
+      background: var(--accent);
+      padding: 10px 6px;
+      min-height: 78px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .date-box .day {
+      font-size: 1.72rem;
+      line-height: 1;
+      font-weight: 900;
+      color: var(--main);
+    }
+
+    .date-box .weekday {
+      margin-top: 7px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .day-card.sat .date-box { background: #eef6ff; }
+    .day-card.sun .date-box { background: #fff1f2; }
+    .day-card.sat .weekday { color: #2563eb; }
+    .day-card.sun .weekday { color: #dc2626; }
+
+    .content { min-width: 0; }
+
+    .topline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+
+    .time {
+      font-weight: 900;
+      color: var(--main);
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.78rem;
+      font-weight: 900;
+      border: 1px solid transparent;
+    }
+
+    .badge.practice { background: var(--practice-bg); color: var(--practice-fg); border-color: #bbf7d0; }
+    .badge.game { background: var(--game-bg); color: var(--game-fg); border-color: #fed7aa; }
+    .badge.test { background: var(--test-bg); color: var(--test-fg); border-color: #fecaca; }
+    .badge.off { background: var(--off-bg); color: var(--off-fg); border-color: #cbd5e1; }
+    .badge.other { background: var(--other-bg); color: var(--other-fg); border-color: #c7d2fe; }
+
+    .activity {
+      font-size: 1.03rem;
+      font-weight: 800;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 9px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .memo {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: #f8fafc;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    .empty {
+      display: none;
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--muted);
+      background: #fff;
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+    }
+
+    footer {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 20px 12px 44px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.7;
+    }
+
+    code {
+      background: #f1f5f9;
+      padding: 2px 5px;
+      border-radius: 6px;
+    }
+
+    @media (min-width: 820px) {
+      .toolbar {
+        grid-template-columns: 1fr auto;
+        align-items: center;
+      }
+    }
+
+    @media (max-width: 540px) {
+      main { padding-left: 10px; padding-right: 10px; }
+      .day-card {
+        grid-template-columns: 64px 1fr;
+        gap: 10px;
+        padding: 12px;
+      }
+      .date-box { min-height: 70px; }
+      .date-box .day { font-size: 1.45rem; }
+      .date-box .weekday { font-size: 0.92rem; }
+      .activity { font-size: 0.98rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="school-name" id="schoolName">西谷中学校 野球部</div>
+    <h1>活動予定表</h1>
+    <div class="month-label" id="monthLabel">予定データ読込中</div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <strong>CSV差し替え方式の活動予定ページです。</strong><br>
+      この <code>index.html</code> と同じフォルダに <code>schedule.csv</code> を置くと、自動で予定を読み込んで表示します。
+      <div class="status" id="statusMessage"></div>
+      <div class="notes" id="notesBox"></div>
+    </section>
+
+    <section class="toolbar" aria-label="予定の絞り込み">
+      <div class="filter-box">
+        <button class="active" data-filter="all">すべて</button>
+        <button data-filter="practice">練習</button>
+        <button data-filter="game">試合</button>
+        <button data-filter="test">テスト</button>
+        <button data-filter="off">OFF</button>
+        <button data-filter="other">その他</button>
+      </div>
+      <div class="legend">
+        <span><i class="dot practice"></i>練習</span>
+        <span><i class="dot game"></i>試合</span>
+        <span><i class="dot test"></i>テスト</span>
+        <span><i class="dot off"></i>OFF</span>
+        <span><i class="dot other"></i>その他</span>
+        <label class="file-label" for="csvFile">CSVを選択して確認</label>
+        <input type="file" id="csvFile" accept=".csv,text/csv" />
+      </div>
+    </section>
+
+    <section class="schedule-list" id="scheduleList"></section>
+    <div class="empty" id="emptyMessage">該当する予定はありません。</div>
+  </main>
+
+  <footer>
+    <p>※予定は変更になる場合があります。正式な連絡は学校・顧問の案内を確認してください。</p>
+    <p>※CSV項目：<code>月,日,曜日,開始,終了,種別,活動内容,午前,午後,場所,メモ</code></p>
+    <p>※GitHub Pages等に公開する場合は、<code>index.html</code> と <code>schedule.csv</code> を同じフォルダに配置してください。</p>
+  </footer>
+
+  <script>
+    const CSV_FILE = "schedule.csv";
+    const DEFAULT_SCHOOL = "西谷中学校 野球部";
+    const DEFAULT_YEAR = new Date().getFullYear();
+
+    const TYPE_MAP = {
+      "練習": "practice",
+      "試合": "game",
+      "練習試合": "game",
+      "大会": "game",
+      "公式戦": "game",
+      "テスト": "test",
+      "テスト休み": "test",
+      "OFF": "off",
+      "ＯＦＦ": "off",
+      "休み": "off",
+      "その他": "other"
+    };
+
+    const TYPE_LABEL = {
+      practice: "練習",
+      game: "試合",
+      test: "テスト",
+      off: "OFF",
+      other: "その他"
+    };
+
+    let scheduleRows = [];
+    let currentFilter = "all";
+
+    function normalize(value) {
+      return String(value ?? "").replace(/^\uFEFF/, "").trim();
+    }
+
+    function escapeHtml(value) {
+      return normalize(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuotes = false;
+
+      text = String(text ?? "").replace(/^\uFEFF/, "");
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            cell += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === "," && !inQuotes) {
+          row.push(cell);
+          cell = "";
+        } else if ((char === "\n" || char === "\r") && !inQuotes) {
+          if (char === "\r" && next === "\n") i++;
+          row.push(cell);
+          if (row.some(v => normalize(v) !== "")) rows.push(row);
+          row = [];
+          cell = "";
+        } else {
+          cell += char;
+        }
+      }
+
+      row.push(cell);
+      if (row.some(v => normalize(v) !== "")) rows.push(row);
+      return rows;
+    }
+
+    function csvToObjects(text) {
+      const table = parseCsv(text);
+      if (table.length < 2) return [];
+
+      const headers = table[0].map(normalize);
+      return table.slice(1).map(line => {
+        const obj = {};
+        headers.forEach((header, index) => {
+          obj[header] = normalize(line[index]);
+        });
+        return obj;
+      }).filter(row => normalize(row["日"]) !== "" && normalize(row["活動内容"]) !== "");
+    }
+
+    function detectType(row) {
+      const rawType = normalize(row["種別"]);
+      const activity = normalize(row["活動内容"]);
+      if (TYPE_MAP[rawType]) return TYPE_MAP[rawType];
+      if (/OFF|ＯＦＦ|休み/i.test(activity)) return "off";
+      if (/テスト/.test(activity)) return "test";
+      if (/試合|大会|VS|ｖｓ|対/.test(activity)) return "game";
+      if (/練習/.test(activity)) return "practice";
+      return "other";
+    }
+
+    function toSchedule(row) {
+      const month = Number(normalize(row["月"])) || "";
+      const day = Number(normalize(row["日"])) || "";
+      const type = detectType(row);
+      return {
+        year: Number(normalize(row["年"])) || DEFAULT_YEAR,
+        month,
+        day,
+        weekday: normalize(row["曜日"]),
+        start: normalize(row["開始"]),
+        end: normalize(row["終了"]),
+        type,
+        activity: normalize(row["活動内容"]),
+        morning: normalize(row["午前"]),
+        afternoon: normalize(row["午後"]),
+        place: normalize(row["場所"]),
+        memo: normalize(row["メモ"])
+      };
+    }
+
+    function formatTime(item) {
+      if (item.start && item.end) return `${item.start}〜${item.end}`;
+      if (item.start) return `${item.start}〜`;
+      if (item.end) return `〜${item.end}`;
+      return "時刻未定";
+    }
+
+    function cardClass(item) {
+      if (item.weekday === "土") return "day-card sat";
+      if (item.weekday === "日") return "day-card sun";
+      return "day-card";
+    }
+
+    function updateMonthLabel(rows) {
+      const monthLabel = document.getElementById("monthLabel");
+      const schoolName = document.getElementById("schoolName");
+      schoolName.textContent = DEFAULT_SCHOOL;
+
+      if (!rows.length) {
+        monthLabel.textContent = "予定データなし";
+        return;
+      }
+
+      const first = rows[0];
+      const months = [...new Set(rows.map(r => r.month).filter(Boolean))];
+      const label = months.length === 1
+        ? `${first.year}年${months[0]}月予定`
+        : `${first.year}年${months[0]}月〜${months[months.length - 1]}月予定`;
+      monthLabel.textContent = label;
+    }
+
+    function renderNotes(rows) {
+      const notesBox = document.getElementById("notesBox");
+      const notes = [];
+      if (!rows.length) {
+        notesBox.style.display = "none";
+        notesBox.innerHTML = "";
+        return;
+      }
+
+      const months = [...new Set(rows.map(r => r.month).filter(Boolean))];
+      notes.push(`表示件数：${rows.length}件`);
+      if (months.length) notes.push(`対象月：${months.join("月、")}月`);
+
+      notesBox.style.display = "block";
+      notesBox.innerHTML = `<strong>読み込み情報</strong><ul>${notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>`;
+    }
+
+    function render(filter = currentFilter) {
+      currentFilter = filter;
+      updateMonthLabel(scheduleRows);
+      renderNotes(scheduleRows);
+
+      const list = document.getElementById("scheduleList");
+      const empty = document.getElementById("emptyMessage");
+      list.innerHTML = "";
+
+      const rows = scheduleRows
+        .filter(item => filter === "all" || item.type === filter)
+        .sort((a, b) => (a.month - b.month) || (a.day - b.day));
+
+      empty.style.display = rows.length ? "none" : "block";
+
+      rows.forEach(item => {
+        const meta = [];
+        if (item.morning) meta.push(`午前：${item.morning}`);
+        if (item.afternoon) meta.push(`午後：${item.afternoon}`);
+        if (item.place) meta.push(`場所：${item.place}`);
+
+        const card = document.createElement("article");
+        card.className = cardClass(item);
+        card.innerHTML = `
+          <div class="date-box">
+            <div class="day">${escapeHtml(item.month)}/${escapeHtml(item.day)}</div>
+            <div class="weekday">${escapeHtml(item.weekday)}</div>
+          </div>
+          <div class="content">
+            <div class="topline">
+              <span class="time">${escapeHtml(formatTime(item))}</span>
+              <span class="badge ${escapeHtml(item.type)}">${escapeHtml(TYPE_LABEL[item.type] || "その他")}</span>
+            </div>
+            <div class="activity">${escapeHtml(item.activity)}</div>
+            ${meta.length ? `<div class="meta">${meta.map(m => `<span>${escapeHtml(m)}</span>`).join("")}</div>` : ""}
+            ${item.memo ? `<div class="memo">${escapeHtml(item.memo)}</div>` : ""}
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function showStatus(message) {
+      const status = document.getElementById("statusMessage");
+      if (!message) {
+        status.style.display = "none";
+        status.textContent = "";
+        return;
+      }
+      status.style.display = "block";
+      status.textContent = message;
+    }
+
+    function loadCsvText(text, sourceLabel) {
+      const objects = csvToObjects(text);
+      scheduleRows = objects.map(toSchedule);
+      if (!scheduleRows.length) {
+        showStatus(`${sourceLabel} を読み込みましたが、表示できる予定がありません。CSVの項目名を確認してください。`);
+      } else {
+        showStatus(`${sourceLabel} を読み込みました。`);
+      }
+      render(currentFilter);
+    }
+
+    async function loadDefaultCsv() {
+      try {
+        const response = await fetch(CSV_FILE, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        loadCsvText(text, CSV_FILE);
+      } catch (error) {
+        scheduleRows = [];
+        showStatus(`同じフォルダの ${CSV_FILE} を読み込めませんでした。GitHub Pagesに公開する場合は index.html と schedule.csv を同じフォルダに置いてください。ローカル確認では「CSVを選択して確認」も使えます。`);
+        render();
+      }
+    }
+
+    document.querySelectorAll("button[data-filter]").forEach(button => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("button[data-filter]").forEach(b => b.classList.remove("active"));
+        button.classList.add("active");
+        render(button.dataset.filter);
+      });
+    });
+
+    document.getElementById("csvFile").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => loadCsvText(String(reader.result || ""), file.name);
+      reader.onerror = () => showStatus("CSVファイルの読み込みに失敗しました。");
+      reader.readAsText(file, "UTF-8");
+    });
+
+    loadDefaultCsv();
+  </script>
+</body>
+</html>
